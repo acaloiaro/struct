@@ -10,14 +10,24 @@ import (
 	"strings"
 )
 
+const (
+	defaultFieldSeparator = " "
+	defaultOutput         = "string"
+	fieldsUsage           = "comma-separated list of fields corresponding to the input data's fields\n\n" +
+		"Example\n\n" +
+		"$ echo \"foo1 bar1\" | struct -fields foo,bar\n" +
+		"$ foo:foo1 bar:bar1\n"
+	outputUsage    = "the desired output format: json or string"
+	separatorUsage = "the character that separates fields in the input data"
+)
+
+var (
+	fieldsFlag fields // a comma-separated list of fields provided by the user
+	outFlag    string // the format (either string or json) in which to structure data
+	sepFlag    string // a string on which to split lines of input
+)
+
 type fields []string
-
-var fieldsFlag fields
-var sepFlag string
-var outFlag string
-
-var in string
-var fieldsProvided int
 
 func (f *fields) String() string {
 	return fmt.Sprint(*f)
@@ -35,51 +45,50 @@ func (f *fields) Set(value string) error {
 	return nil
 }
 
-const (
-	defaultFieldSeparator = " "
-	defaultOutput         = "string"
-	fieldsUsage           = "comma-separated list of fields corresponding to the input data's fields\n\n" +
-		"Example\n\n" +
-		"$ echo \"foo1 bar1\" | struct -fields foo,bar\n" +
-		"$ foo:foo1 bar:bar1\n"
-	outputUsage    = "the desired output format: json or string"
-	separatorUsage = "the character that separates fields in the input data"
-)
-
 func init() {
 
-	flag.Var(&fieldsFlag, "fields", fieldsUsage)
-	flag.StringVar(&sepFlag, "separator", defaultFieldSeparator, separatorUsage)
-	flag.StringVar(&outFlag, "output", defaultOutput, outputUsage)
-	setupFlags(flag.CommandLine)
+	flagset := flag.CommandLine
+	flagset.Var(&fieldsFlag, "fields", fieldsUsage)
+	flagset.StringVar(&sepFlag, "separator", defaultFieldSeparator, separatorUsage)
+	flagset.StringVar(&outFlag, "output", defaultOutput, outputUsage)
 
-	flag.Parse()
+	flagset.Usage = func() {
+		fmt.Println("\nCreate structured output from unstructured input")
+
+		flagset.PrintDefaults()
+	}
+
+	flagset.Parse(os.Args[1:])
 }
 
 func setupFlags(f *flag.FlagSet) {
-	f.Usage = func() {
-		fmt.Println("\nCreate structured data input strings")
 
-		f.PrintDefaults()
-	}
 }
 
 var sb strings.Builder
 var jsonMap = make(map[string]string)
 
 func main() {
-	fieldsProvided = len(fieldsFlag)
+	fieldsProvided := len(fieldsFlag)
 
 	scanner := bufio.NewScanner(os.Stdin)
 
 	var i int
-	var field, v string
+	var field, in, v string
 
+	// perform a line-wise scan over stdin until EOF
 	for scanner.Scan() {
 		in = scanner.Text()
 
-		inputFields := strings.Fields(in)
+		// if the separator string is overridden, split on it instead of the default of splitting on space
+		var inputFields []string
+		if sepFlag != defaultFieldSeparator {
+			inputFields = strings.Split(in, sepFlag)
+		} else {
+			inputFields = strings.Fields(in)
+		}
 
+		// for every field to be retained from the input, build a representation of it in the output
 		for i, v = range inputFields {
 			if i < fieldsProvided {
 
@@ -88,7 +97,10 @@ func main() {
 				field = ""
 			}
 
-			buildOutput(field, v)
+			if err := buildOutput(field, v); err != nil {
+				fmt.Println(err.Error())
+				return
+			}
 		}
 
 		fmt.Println(out())
@@ -96,32 +108,36 @@ func main() {
 }
 
 func out() (out string) {
-	if outFlag == "string" {
+
+	switch outFlag {
+	case "string":
 		out = sb.String()
 		sb.Reset()
-	} else if outFlag == "json" {
+	case "json":
 		o, _ := json.Marshal(jsonMap)
 		out = string(o)
 		for k := range jsonMap {
 			delete(jsonMap, k)
 		}
-	} else {
+	default:
 		out = ""
 	}
 
 	return
 }
 
-func buildOutput(field, value string) error {
-	if outFlag == "string" {
+func buildOutput(field, value string) (err error) {
+	switch outFlag {
+	case "string":
 		buildString(field, value)
-	} else if outFlag == "json" {
+	case "json":
 		buildJSON(field, value)
-	} else {
-		return errors.New("invalid output option")
+	default:
+		err = fmt.Errorf("invalid -output option: %s", outFlag)
+		return
 	}
 
-	return nil
+	return
 }
 
 func buildString(field, value string) {
@@ -129,10 +145,10 @@ func buildString(field, value string) {
 		sb.WriteString(field)
 		sb.WriteString(":")
 		sb.WriteString(value)
-		sb.WriteString(sepFlag)
+		sb.WriteString(defaultFieldSeparator)
 	} else {
 		sb.WriteString(value)
-		sb.WriteString(sepFlag)
+		sb.WriteString(defaultFieldSeparator)
 	}
 }
 
