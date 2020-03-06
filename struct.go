@@ -19,31 +19,15 @@ const (
 		"$ foo:foo1 bar:bar1\n"
 	outputUsage    = "the desired output format: json or string"
 	separatorUsage = "the character that separates fields in the input data"
+	skipHeadUsage  = "the number of lines to skip from the beginning of the input"
 )
 
 var (
 	fieldsFlag fields // a comma-separated list of fields provided by the user
 	outFlag    string // the format (either string or json) in which to structure data
 	sepFlag    string // a string on which to split lines of input
+	skipHead   int    // the number of lines to skip from the head
 )
-
-type fields []string
-
-func (f *fields) String() string {
-	return fmt.Sprint(*f)
-}
-
-func (f *fields) Set(value string) error {
-	if len(*f) > 0 {
-		return errors.New("fields switch already set")
-	}
-
-	for _, field := range strings.Split(value, ",") {
-		*f = append(*f, field)
-	}
-
-	return nil
-}
 
 func init() {
 
@@ -51,18 +35,20 @@ func init() {
 	flagset.Var(&fieldsFlag, "fields", fieldsUsage)
 	flagset.StringVar(&sepFlag, "separator", defaultFieldSeparator, separatorUsage)
 	flagset.StringVar(&outFlag, "output", defaultOutput, outputUsage)
+	flagset.IntVar(&skipHead, "skip-head", 0, skipHeadUsage)
 
 	flagset.Usage = func() {
-		fmt.Println("\nCreate structured output from unstructured input")
+		fmt.Println("struct creates structured output from unstructured input")
 
 		flagset.PrintDefaults()
 	}
 
 	flagset.Parse(os.Args[1:])
-}
 
-func setupFlags(f *flag.FlagSet) {
-
+	if len(fieldsFlag) == 0 {
+		flagset.Usage()
+		os.Exit(0)
+	}
 }
 
 var sb strings.Builder
@@ -73,11 +59,17 @@ func main() {
 
 	scanner := bufio.NewScanner(os.Stdin)
 
-	var i int
+	var i, line int
 	var field, in, v string
 
 	// perform a line-wise scan over stdin until EOF
 	for scanner.Scan() {
+		line++
+
+		if line <= skipHead {
+			continue
+		}
+
 		in = scanner.Text()
 
 		// if the separator string is overridden, split on it instead of the default of splitting on space
@@ -158,4 +150,22 @@ func buildJSON(field, value string) {
 	}
 
 	jsonMap[field] = value
+}
+
+type fields []string
+
+func (f *fields) String() string {
+	return fmt.Sprint(*f)
+}
+
+func (f *fields) Set(value string) error {
+	if len(*f) > 0 {
+		return errors.New("fields switch already set")
+	}
+
+	for _, field := range strings.Split(value, ",") {
+		*f = append(*f, field)
+	}
+
+	return nil
 }
