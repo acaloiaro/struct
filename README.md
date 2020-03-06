@@ -1,6 +1,6 @@
 # struct
 
-A simple unix utility for structuring string data on the command line.
+A simple cli utility that transforms unstructured input into structured output.
 
 # install
 
