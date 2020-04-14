@@ -49,4 +49,5 @@ $ ls -l | struct -fields permissions,count,user,group,,,,,file_name -output json
   "group": "staff",
   "permissions": "-rw-r--r--",
   "user": "adriano"
-}```
+}
+
