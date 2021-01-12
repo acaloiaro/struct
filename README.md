@@ -4,7 +4,7 @@ A simple cli utility that transforms unstructured input into structured output.
 
 # install
 
-`$ get get github.com/acaloiaro/struct`
+`$ go get github.com/acaloiaro/struct`
 
 # example usage
 
