@@ -1,3 +1,5 @@
+**NOTICE**: This repository has been moved to [https://code.adriano.fyi/me/struct](https://code.adriano.fyi/me/struct). Microsoft has shown little interest in stewarding what was once the best and largest open source community. This small act of migration is my way showing that we don't all support Microsoft's disinterest.
+
 # struct
 
 A simple cli utility that transforms unstructured input into structured output.
@@ -50,4 +52,3 @@ $ ls -l | struct -fields permissions,count,user,group,,,,,file_name -output json
   "permissions": "-rw-r--r--",
   "user": "adriano"
 }
-
